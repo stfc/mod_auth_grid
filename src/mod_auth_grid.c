@@ -82,7 +82,7 @@ parse_line(apr_file_t *file, char buf[1024], char **dn, char **username)
 }
 
 /*
- * Find the last line in the grid-mapfile that matches the DN and has a
+ * Find the fisrt line in the grid-mapfile that matches the DN and has a
  * username.
  */
 static char *
@@ -93,11 +93,29 @@ get_username(apr_pool_t *p, apr_file_t *file, const char *user_dn)
 	char *username;
 	char *sav_username = NULL;
 
-	while (parse_line(file, buf, &dn, &username) != EOF)
-		if (dn != NULL
-		 && username != NULL
-		 && strcasecmp(dn, user_dn) == 0)
-			sav_username = apr_pstrdup(p, username);
+	int dn_len;
+	int user_dn_len;
+
+	user_dn_len = strlen(user_dn);
+
+	while (parse_line(file, buf, &dn, &username) != EOF) {
+		if (dn != NULL && username != NULL) {
+			// attempt to match a normal DN
+			if (strcasecmp(dn, user_dn) == 0) {
+				sav_username = apr_pstrdup(p, username);
+				break;
+			}
+
+			// attempt to match a proxy DN
+			dn_len = strlen(dn);
+			if (user_dn_len > dn_len
+			 && strncasecmp(dn, user_dn, dn_len) == 0
+			 && '/' == user_dn[dn_len]) {
+				sav_username = apr_pstrdup(p, username);
+				break;
+			}
+		}
+	}
 
 	return sav_username;
 }
